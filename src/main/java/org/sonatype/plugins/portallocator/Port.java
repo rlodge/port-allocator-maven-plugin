@@ -1,79 +1,77 @@
 package org.sonatype.plugins.portallocator;
 
-public class Port
-{
+import org.apache.maven.plugin.MojoExecutionException;
 
-    public static final String DEFAULT = "default";
+public class Port {
 
-    /**
-     * When true will break the build if the preferred port number is not available. If false will allocate another
-     * port.
-     */
-    private boolean failIfOccupied;
+	public static final String DEFAULT = "default";
 
-    /**
-     * Port name used to add to properties. Required.
-     */
-    private String name;
+	/**
+	 * When true will break the build if the preferred port number is not available. If false will allocate another
+	 * port.
+	 */
+	private boolean failIfOccupied;
 
-    /**
-     * A preferred port
-     */
-    private int portNumber;
+	/**
+	 * Port name used to add to properties. Required.
+	 */
+	private String name;
 
-    /**
-     * The port type. At present time the only accepted value is 'default'
-     */
-    private String type = DEFAULT;
+	/**
+	 * A preferred port
+	 */
+	private int portNumber;
 
-    public Port()
-    {
-        super();
-    }
+	/**
+	 * The port type.
+	 *
+	 * @see org.sonatype.plugins.portallocator.PortType
+	 */
+	private PortType type = PortType.RANDOM;
 
-    public Port( String name )
-    {
-        super();
-        this.name = name;
-    }
+	public Port() {
+		super();
+	}
 
-    public boolean getFailIfOccupied()
-    {
-        return failIfOccupied;
-    }
+	public Port(String name) {
+		super();
+		this.name = name;
+	}
 
-    public String getName()
-    {
-        return name;
-    }
+	public boolean getFailIfOccupied() {
+		return failIfOccupied;
+	}
 
-    public int getPortNumber()
-    {
-        return portNumber;
-    }
+	public String getName() {
+		return name;
+	}
 
-    public String getType()
-    {
-        return type;
-    }
+	public int getPortNumber() {
+		return portNumber;
+	}
 
-    public void setFailIfOccupied( boolean failIfOccupied )
-    {
-        this.failIfOccupied = failIfOccupied;
-    }
+	public PortType getType() {
+		return type;
+	}
 
-    public void setName( String name )
-    {
-        this.name = name;
-    }
+	public void setFailIfOccupied(boolean failIfOccupied) {
+		this.failIfOccupied = failIfOccupied;
+	}
 
-    public void setPortNumber( int portNumber )
-    {
-        this.portNumber = portNumber;
-    }
+	public void setName(String name) {
+		this.name = name;
+	}
 
-    public void setType( String type )
-    {
-        this.type = type;
-    }
+	public void setPortNumber(int portNumber) {
+		this.portNumber = portNumber;
+	}
+
+	public void setType(PortType type) {
+		this.type = type;
+	}
+
+	public int allocatePort(PortAllocator allocator) throws PortUnavailableException, MojoExecutionException {
+		return type.allocationStrategy.allocatePort(getPortNumber(), allocator);
+	}
+
 }

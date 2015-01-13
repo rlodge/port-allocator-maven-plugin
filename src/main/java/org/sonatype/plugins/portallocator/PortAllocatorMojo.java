@@ -1,121 +1,87 @@
 package org.sonatype.plugins.portallocator;
 
-import java.io.IOException;
-import java.net.ServerSocket;
-
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.project.MavenProject;
 
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.ServerSocket;
+
 /**
  * Allocate ports to be used during build process
  *
- * @goal allocate-ports
  * @author velo
+ * @goal allocate-ports
  */
 public class PortAllocatorMojo
-    extends AbstractMojo
-{
+	extends AbstractMojo
+	implements PortAllocator {
 
-    /**
-     * Define which ports should be allocated by the plugin
-     *
-     * @parameter
-     * @required
-     */
-    private Port[] ports;
+	/**
+	 * Define which ports should be allocated by the plugin
+	 *
+	 * @parameter
+	 * @required
+	 */
+	private Port[] ports;
 
-    /**
-     * @parameter expression="${project}"
-     * @required
-     */
-    private MavenProject project;
+	/**
+	 * @parameter expression="${project}"
+	 * @required
+	 */
+	private MavenProject project;
 
-    public void execute()
-        throws MojoExecutionException, MojoFailureException
-    {
-        for ( Port port : ports )
-        {
-            String name = port.getName();
-            if ( name == null )
-            {
-                getLog().warn( "Port name not defined.  Skipping." );
-                continue;
-            }
+	public void execute()
+		throws MojoExecutionException, MojoFailureException {
+		for (Port port : ports) {
+			String name = port.getName();
+			if (name == null) {
+				getLog().warn("Port name not defined.  Skipping.");
+				continue;
+			}
 
-            String type = port.getType();
-            int portNumber;
-            if ( Port.DEFAULT.equals( type ) )
-            {
-                portNumber = handleDefaultPort( port );
-            }
-            else
-            {
-                throw new MojoFailureException( "Unsupported port type '" + type + "' for '" + port.getName() + "'" );
-            }
+			if (!project.getProperties().containsKey(name)) {
+				int portNumber = port.allocatePort(this);
+				getLog().info("Assigning port '" + portNumber + "' to property '" + name + "'");
+				project.getProperties().put(name, String.valueOf(portNumber));
+			} else {
+				getLog().warn("Property '"  + name + "' already has value '" + project.getProperties().get(name) + "'");
+			}
+		}
+	}
 
-            getLog().info( "Assigning port '" + portNumber + "' to property '" + name + "'" );
-            project.getProperties().put( name, String.valueOf( portNumber ) );
-        }
-    }
+	public boolean allocatePort(final int portNumber) throws MojoExecutionException {
+		try {
+			tryOnHost(portNumber, InetAddress.getLocalHost());
+			tryOnHost(portNumber, InetAddress.getLoopbackAddress());
+		} catch (IOException e) {
+			return false;
+		}
+		return true;
+	}
 
-    private int handleDefaultPort( Port port )
-        throws MojoFailureException, MojoExecutionException
-    {
-        try
-        {
-            // try to allocate the desired port
-            return allocate( port.getPortNumber() );
-        }
-        catch ( PortUnavailableException e )
-        {
-            // fail if the desired port should be allocated
-            if ( port.getFailIfOccupied() )
-            {
-                throw e;
-            }
-            else
-            {
-                // or try a random port if this is not a problem
-                return allocate( 0 );
-            }
-        }
-    }
+	private void tryOnHost(final int portNumber, final InetAddress host) throws IOException, MojoExecutionException {
+		final ServerSocket server;
+		server = new ServerSocket(portNumber, 50, host);
+		try {
+			server.close();
+		} catch (IOException e) {
+			throw new MojoExecutionException("Unable to release port " + portNumber, e);
+		}
+	}
 
-    private int allocate( int portNumber )
-        throws PortUnavailableException, MojoFailureException, MojoExecutionException
-    {
-        ServerSocket server;
-        try
-        {
-            server = new ServerSocket( portNumber );
-        }
-        catch ( IOException e )
-        {
-            throw new PortUnavailableException( e.getLocalizedMessage(), e );
-        }
+	public MavenProject getProject() {
+		return project;
+	}
 
-        portNumber = server.getLocalPort();
-        try
-        {
-            server.close();
-        }
-        catch ( IOException e )
-        {
-            throw new MojoExecutionException( "Unable to release port " + portNumber, e );
-        }
-        return portNumber;
-    }
+	public void setProject(MavenProject project) {
+		this.project = project;
+	}
 
-    public void setProject( MavenProject project )
-    {
-        this.project = project;
-    }
-
-    public void setPorts( Port[] ports )
-    {
-        this.ports = ports;
-    }
+	public void setPorts(Port[] ports) {
+		this.ports = ports;
+	}
 
 }

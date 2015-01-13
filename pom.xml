@@ -7,8 +7,8 @@
     <version>8</version>
   </parent>
 
-  <artifactId>port-allocator-maven-plugin</artifactId>
-  <version>1.3-SNAPSHOT</version>
+  <artifactId>ex-port-allocator-maven-plugin</artifactId>
+  <version>1.3</version>
 
   <packaging>maven-plugin</packaging>
 
@@ -17,9 +17,9 @@
   <url>http://github.com/sonatype/port-allocator-maven-plugin</url>
 
   <scm>
-    <connection>scm:git:git@github.com:sonatype/port-allocator-maven-plugin.git</connection>
-    <developerConnection>scm:git:git@github.com:sonatype/port-allocator-maven-plugin.git</developerConnection>
-    <url>http://github.com/sonatype/port-allocator-maven-plugin</url>
+    <connection>scm:git:git@github.com:rlodge/port-allocator-maven-plugin.git</connection>
+    <developerConnection>scm:git:git@github.com:rlodge/port-allocator-maven-plugin.git</developerConnection>
+    <url>https://github.com/rlodge/port-allocator-maven-plugin</url>
   </scm>
 
   <ciManagement>
