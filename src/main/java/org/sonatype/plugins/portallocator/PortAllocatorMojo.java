@@ -6,8 +6,14 @@ import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.project.MavenProject;
 
 import java.io.IOException;
+import java.net.BindException;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Allocate ports to be used during build process
@@ -54,21 +60,102 @@ public class PortAllocatorMojo
 
 	public boolean allocatePort(final int portNumber) throws MojoExecutionException {
 		try {
-			tryOnHost(portNumber, InetAddress.getLocalHost());
-			tryOnHost(portNumber, InetAddress.getLoopbackAddress());
+			Set<InetAddress> addresses = new HashSet<InetAddress>();
+			Collections.addAll(addresses, InetAddress.getAllByName("localhost"));
+			Collections.addAll(addresses, InetAddress.getLocalHost());
+			Collections.addAll(addresses, InetAddress.getAllByName(java.net.InetAddress.getLocalHost().getHostName()));
+			Collections.addAll(addresses, InetAddress.getLoopbackAddress());
+			Collections.addAll(addresses, InetAddress.getByName("0.0.0.0"));
+			Collections.addAll(addresses, InetAddress.getByName("localhost"));
+			Collections.addAll(addresses, InetAddress.getByName("::1"));
+			Collections.addAll(addresses, InetAddress.getByName("::"));
+			for (InetAddress address : addresses) {
+				tryOnHost(portNumber, address);
+			}
 		} catch (IOException e) {
 			return false;
 		}
 		return true;
 	}
 
+	private boolean isPortShutdown(int port, int connectTimeout) {
+		Socket s = new Socket();
+		try {
+			getLog().debug(
+				"\tConnection attempt with socket " + s + ", current time is "
+					+ System.currentTimeMillis()
+			);
+
+			s.bind(null);
+
+			// If the remote port is closed, s.connect will throw an exception
+			s.connect(new InetSocketAddress("localhost", port), connectTimeout);
+			getLog().debug(
+				"\tSocket " + s + " for port " + port + " managed to connect"
+			);
+
+			try {
+				s.shutdownOutput();
+			} catch (IOException e) {
+				// ignored, irrelevant
+				getLog().debug(
+					"\tFailed to shutdown output for socket " + s + ": " + e
+				);
+			}
+			try {
+				s.shutdownInput();
+			} catch (IOException e) {
+				// ignored, irrelevant
+				getLog().debug(
+					"\tFailed to shutdown input for socket " + s + ": " + e
+				);
+			}
+
+			getLog().debug(
+				"\tSocket " + s + " for port " + port + " shutdown"
+			);
+		} catch (IOException ignored) {
+			// If an IOException has occured, this means port is shut down
+			return true;
+		} finally {
+			try {
+				s.close();
+			} catch (IOException e) {
+				// ignored, irrelevant
+				getLog().debug(
+					"\tFailed to close socket " + s + ": " + e
+				);
+			} finally {
+				getLog().debug(
+					"\tSocket " + s + " for port " + port + " closed"
+				);
+
+				s = null;
+				System.gc();
+			}
+		}
+
+		return false;
+	}
+
 	private void tryOnHost(final int portNumber, final InetAddress host) throws IOException, MojoExecutionException {
 		final ServerSocket server;
-		server = new ServerSocket(portNumber, 50, host);
+		try {
+			server = new ServerSocket(portNumber, 50, host);
+		} catch (BindException e) {
+			if ("Can't assign requested address".equals(e.getMessage())) {
+				//Suppress this one and return
+				return;
+			}
+			throw e;
+		}
 		try {
 			server.close();
 		} catch (IOException e) {
 			throw new MojoExecutionException("Unable to release port " + portNumber, e);
+		}
+		if (!isPortShutdown(portNumber, 0)) {
+			throw new IOException("Port not shutdown");
 		}
 	}
 
