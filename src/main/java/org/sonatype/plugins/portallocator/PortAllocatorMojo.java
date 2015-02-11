@@ -160,7 +160,7 @@ public class PortAllocatorMojo
 		} catch (IOException e) {
 			throw new MojoExecutionException("Unable to release port " + portNumber, e);
 		}
-		if (!isPortShutdown(portNumber, 0, host)) {
+		if (!isPortShutdown(portNumber, 100, host)) {
 			throw new IOException("Port not shutdown");
 		}
 	}
