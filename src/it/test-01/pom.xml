@@ -1,0 +1,76 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<groupId>org.test</groupId>
+	<version>testing</version>
+	<artifactId>test-01</artifactId>
+	<packaging>jar</packaging>
+	<name>A basic test for the port-allocator-maven-plugin</name>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>@project.groupId@</groupId>
+				<artifactId>@project.artifactId@</artifactId>
+				<version>@project.version@</version>
+				<executions>
+					<execution>
+						<phase>validate</phase>
+						<goals>
+							<goal>allocate-ports</goal>
+						</goals>
+						<configuration>
+							<ports>
+								<port>
+									<name>build.port</name>
+									<portNumber>8080</portNumber>
+									<type>INCREMENTING</type>
+								</port>
+								<port>
+									<name>build.apjPort</name>
+									<portNumber>8010</portNumber>
+								</port>
+								<port>
+									<name>build.stopPort</name>
+									<portNumber>9977</portNumber>
+								</port>
+								<port>
+									<name>build.cargoDebugPort</name>
+									<portNumber>5005</portNumber>
+									<type>INCREMENTING</type>
+								</port>
+								<port>
+									<name>karaf.rmi.server.port</name>
+									<portNumber>1099</portNumber>
+								</port>
+								<port>
+									<name>karaf.rmi.registry.port</name>
+									<portNumber>44444</portNumber>
+								</port>
+							</ports>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>properties-maven-plugin</artifactId>
+				<version>1.0.0</version>
+				<executions>
+					<execution>
+						<phase>generate-resources</phase>
+						<goals>
+							<goal>write-project-properties</goal>
+						</goals>
+						<configuration>
+							<outputFile>
+								${project.build.directory}/app.properties
+							</outputFile>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
+
+</project>
