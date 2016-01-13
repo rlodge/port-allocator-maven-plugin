@@ -15,6 +15,7 @@ import java.net.Socket;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.Callable;
 
 /**
  * Allocate ports to be used during build process
@@ -54,7 +55,7 @@ public class PortAllocatorMojo
 				getLog().info("Assigning port '" + portNumber + "' to property '" + name + "'");
 				project.getProperties().put(name, String.valueOf(portNumber));
 			} else {
-				getLog().warn("Property '"  + name + "' already has value '" + project.getProperties().get(name) + "'");
+				getLog().warn("Property '" + name + "' already has value '" + project.getProperties().get(name) + "'");
 			}
 		}
 	}
@@ -62,14 +63,49 @@ public class PortAllocatorMojo
 	public boolean allocatePort(final int portNumber) throws MojoExecutionException {
 		try {
 			Set<InetAddress> addresses = new HashSet<InetAddress>();
-			Collections.addAll(addresses, InetAddress.getAllByName("localhost"));
-			Collections.addAll(addresses, InetAddress.getLocalHost());
-			Collections.addAll(addresses, InetAddress.getAllByName(java.net.InetAddress.getLocalHost().getHostName()));
-			Collections.addAll(addresses, InetAddress.getLoopbackAddress());
-			Collections.addAll(addresses, InetAddress.getByName("0.0.0.0"));
-			Collections.addAll(addresses, InetAddress.getByName("localhost"));
-			Collections.addAll(addresses, InetAddress.getByName("::1"));
-			Collections.addAll(addresses, InetAddress.getByName("::"));
+			safelyAddHost(addresses, new Callable<InetAddress[]>() {
+
+				public InetAddress[] call() throws Exception {
+					return InetAddress.getAllByName("localhost");
+				}
+			});
+			safelyAddHost(addresses, new Callable<InetAddress[]>() {
+
+				public InetAddress[] call() throws Exception {
+					return InetAddress.getAllByName(InetAddress.getLocalHost().getHostName());
+				}
+			});
+			safelyAddHost(addresses, new Callable<InetAddress[]>() {
+
+				public InetAddress[] call() throws Exception {
+					return new InetAddress[]{InetAddress.getLocalHost()};
+				}
+			});
+			safelyAddHost(addresses, new Callable<InetAddress[]>() {
+				public InetAddress[] call() throws Exception {
+					return new InetAddress[]{InetAddress.getLoopbackAddress()};
+				}
+			});
+			safelyAddHost(addresses, new Callable<InetAddress[]>() {
+				public InetAddress[] call() throws Exception {
+					return new InetAddress[]{InetAddress.getByName("0.0.0.0")};
+				}
+			});
+			safelyAddHost(addresses, new Callable<InetAddress[]>() {
+				public InetAddress[] call() throws Exception {
+					return new InetAddress[]{InetAddress.getByName("localhost")};
+				}
+			});
+			safelyAddHost(addresses, new Callable<InetAddress[]>() {
+				public InetAddress[] call() throws Exception {
+					return new InetAddress[]{InetAddress.getByName("::1")};
+				}
+			});
+			safelyAddHost(addresses, new Callable<InetAddress[]>() {
+				public InetAddress[] call() throws Exception {
+					return new InetAddress[]{InetAddress.getByName("::")};
+				}
+			});
 			Boolean preferIPv4 = Boolean.valueOf(System.getProperty("java.net.preferIPv4Stack", "false"));
 			for (InetAddress address : addresses) {
 				if (address instanceof Inet4Address || !preferIPv4) {
@@ -84,6 +120,18 @@ public class PortAllocatorMojo
 			return false;
 		}
 		return true;
+	}
+
+	private void safelyAddHost(
+		final Set<InetAddress> addresses,
+		final Callable<InetAddress[]> fn
+	) {
+		try {
+			Collections.addAll(addresses, fn.call());
+		} catch (Exception e) {
+			//Makes no sense to do this.
+			getLog().debug("Failed to resolve putative local address.  Ignoring.", e);
+		}
 	}
 
 	private boolean isPortShutdown(int port, int connectTimeout, InetAddress host) {
