@@ -73,7 +73,10 @@ public class PortAllocatorMojo
 			Boolean preferIPv4 = Boolean.valueOf(System.getProperty("java.net.preferIPv4Stack", "false"));
 			for (InetAddress address : addresses) {
 				if (address instanceof Inet4Address || !preferIPv4) {
+					getLog().debug("Trying " + portNumber + " on " + address);
 					tryOnHost(portNumber, address);
+				} else {
+					getLog().debug("Skipping testing " + portNumber + " on " + address + " because it's not an IPV4 address and we're preferring IPV4");
 				}
 			}
 		} catch (IOException e) {
@@ -121,7 +124,7 @@ public class PortAllocatorMojo
 			);
 		} catch (IOException ignored) {
 			// If an IOException has occured, this means port is shut down
-			getLog().debug("\tFailed to connect " + ignored);
+			getLog().debug("\tFailed to connect " + ignored + " so this port is open on this interface");
 			return true;
 		} finally {
 			try {
