@@ -10,12 +10,17 @@ import java.net.BindException;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.text.NumberFormat;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Allocate ports to be used during build process
@@ -41,8 +46,13 @@ public class PortAllocatorMojo
 	 */
 	private MavenProject project;
 
+	Set<InetAddress> addresses = new HashSet<InetAddress>();
+
 	public void execute()
 		throws MojoExecutionException, MojoFailureException {
+
+		resolveAddresses();
+
 		for (Port port : ports) {
 			String name = port.getName();
 			if (name == null) {
@@ -51,8 +61,9 @@ public class PortAllocatorMojo
 			}
 
 			if (!project.getProperties().containsKey(name)) {
+				Stopwatch stopwatch = new Stopwatch();
 				int portNumber = port.allocatePort(this);
-				getLog().info("Assigning port '" + portNumber + "' to property '" + name + "'");
+				getLog().info("Assigning port '" + portNumber + "' to property '" + name + "'; duration: " + stopwatch);
 				project.getProperties().put(name, String.valueOf(portNumber));
 			} else {
 				getLog().warn("Property '" + name + "' already has value '" + project.getProperties().get(name) + "'");
@@ -60,57 +71,48 @@ public class PortAllocatorMojo
 		}
 	}
 
+	private void resolveAddresses() {
+		Stopwatch stopwatch = new Stopwatch();
+		safelyAddHost("InetAddress.getLoopbackAddress()", addresses, new Callable<InetAddress[]>() {
+			public InetAddress[] call() throws Exception {
+				return new InetAddress[]{InetAddress.getLoopbackAddress()};
+			}
+		});
+		safelyAddHost("InetAddress.getByName(\"::1\")", addresses, new Callable<InetAddress[]>() {
+			public InetAddress[] call() throws Exception {
+				return new InetAddress[]{InetAddress.getByName("::1")};
+			}
+		});
+		safelyAddHost("InetAddress.getByName(\"127.0.0.1\")", addresses, new Callable<InetAddress[]>() {
+			public InetAddress[] call() throws Exception {
+				return new InetAddress[]{InetAddress.getByName("127.0.0.1")};
+			}
+		});
+
+		safelyAddHost("NetworkInterface.getNetworkInterfaces()", addresses, new Callable<InetAddress[]>() {
+			public InetAddress[] call() throws Exception {
+				Enumeration<NetworkInterface> nets = NetworkInterface.getNetworkInterfaces();
+				Set<InetAddress> addresses = new HashSet<InetAddress>();
+				for (NetworkInterface netint : Collections.list(nets)) {
+					addresses.addAll(Collections.list(netint.getInetAddresses()));
+				}
+				return addresses.toArray(new InetAddress[addresses.size()]);
+			}
+		});
+
+		getLog().info("Resolved possible hosts in " + stopwatch + ": " + addresses);
+	}
+
 	public boolean allocatePort(final int portNumber) throws MojoExecutionException {
 		try {
-			Set<InetAddress> addresses = new HashSet<InetAddress>();
-			safelyAddHost(addresses, new Callable<InetAddress[]>() {
 
-				public InetAddress[] call() throws Exception {
-					return InetAddress.getAllByName("localhost");
-				}
-			});
-			safelyAddHost(addresses, new Callable<InetAddress[]>() {
-
-				public InetAddress[] call() throws Exception {
-					return InetAddress.getAllByName(InetAddress.getLocalHost().getHostName());
-				}
-			});
-			safelyAddHost(addresses, new Callable<InetAddress[]>() {
-
-				public InetAddress[] call() throws Exception {
-					return new InetAddress[]{InetAddress.getLocalHost()};
-				}
-			});
-			safelyAddHost(addresses, new Callable<InetAddress[]>() {
-				public InetAddress[] call() throws Exception {
-					return new InetAddress[]{InetAddress.getLoopbackAddress()};
-				}
-			});
-			safelyAddHost(addresses, new Callable<InetAddress[]>() {
-				public InetAddress[] call() throws Exception {
-					return new InetAddress[]{InetAddress.getByName("0.0.0.0")};
-				}
-			});
-			safelyAddHost(addresses, new Callable<InetAddress[]>() {
-				public InetAddress[] call() throws Exception {
-					return new InetAddress[]{InetAddress.getByName("localhost")};
-				}
-			});
-			safelyAddHost(addresses, new Callable<InetAddress[]>() {
-				public InetAddress[] call() throws Exception {
-					return new InetAddress[]{InetAddress.getByName("::1")};
-				}
-			});
-			safelyAddHost(addresses, new Callable<InetAddress[]>() {
-				public InetAddress[] call() throws Exception {
-					return new InetAddress[]{InetAddress.getByName("::")};
-				}
-			});
 			Boolean preferIPv4 = Boolean.valueOf(System.getProperty("java.net.preferIPv4Stack", "false"));
 			for (InetAddress address : addresses) {
 				if (address instanceof Inet4Address || !preferIPv4) {
+					Stopwatch stopwatch = new Stopwatch();
 					getLog().debug("Trying " + portNumber + " on " + address);
 					tryOnHost(portNumber, address);
+					getLog().debug("Success for " + portNumber + " on " + address + " in " + stopwatch);
 				} else {
 					getLog().debug("Skipping testing " + portNumber + " on " + address + " because it's not an IPV4 address and we're preferring IPV4");
 				}
@@ -123,14 +125,18 @@ public class PortAllocatorMojo
 	}
 
 	private void safelyAddHost(
+		final String name,
 		final Set<InetAddress> addresses,
 		final Callable<InetAddress[]> fn
 	) {
+		Stopwatch stopwatch = new Stopwatch();
 		try {
-			Collections.addAll(addresses, fn.call());
+			final InetAddress[] result = fn.call();
+			Collections.addAll(addresses, result);
+			getLog().debug("Resolved " + name + " to " + Arrays.toString(result) + " in " + stopwatch);
 		} catch (Exception e) {
 			//Makes no sense to do this.
-			getLog().debug("Failed to resolve putative local address.  Ignoring.", e);
+			getLog().debug("Failed to resolve putative local address.  Ignoring. Duration: " + stopwatch, e);
 		}
 	}
 
@@ -228,4 +234,13 @@ public class PortAllocatorMojo
 		this.ports = ports;
 	}
 
+
+	static class Stopwatch {
+		long start = System.nanoTime();
+
+		@Override
+		public String toString() {
+			return NumberFormat.getNumberInstance().format((double)(System.nanoTime() - start) / TimeUnit.SECONDS.toNanos(1)) + "s";
+		}
+	}
 }
