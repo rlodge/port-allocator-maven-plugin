@@ -8,7 +8,7 @@
   </parent>
 
   <artifactId>ex-port-allocator-maven-plugin</artifactId>
-  <version>1.3.6</version>
+  <version>1.3.7</version>
 
   <packaging>maven-plugin</packaging>
 
@@ -48,8 +48,8 @@
         <version>2.3.2</version>
         <configuration>
           <!-- http://maven.apache.org/plugins/maven-compiler-plugin/ -->
-          <source>1.5</source>
-          <target>1.5</target>
+          <source>1.8</source>
+          <target>1.8</target>
         </configuration>
       </plugin>
       <plugin>

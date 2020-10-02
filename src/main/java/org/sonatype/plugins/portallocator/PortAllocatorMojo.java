@@ -194,7 +194,6 @@ public class PortAllocatorMojo
 				);
 
 				s = null;
-				System.gc();
 			}
 		}
 
@@ -240,7 +239,7 @@ public class PortAllocatorMojo
 
 		@Override
 		public String toString() {
-			return NumberFormat.getNumberInstance().format((double)(System.nanoTime() - start) / TimeUnit.SECONDS.toNanos(1)) + "s";
+			return NumberFormat.getNumberInstance().format((double) (System.nanoTime() - start) / TimeUnit.SECONDS.toNanos(1)) + "s";
 		}
 	}
 }
